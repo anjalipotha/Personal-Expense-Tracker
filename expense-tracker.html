@@ -1,0 +1,558 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Ledger — Personal Expense Tracker</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,400;9..144,500;9..144,600&family=Inter:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --paper: #EDEAE1;
+    --card: #F7F5EF;
+    --line: #D9D2C2;
+    --ink: #1E2A22;
+    --ink-soft: #5B6357;
+    --income: #2F6F4E;
+    --income-bg: #E3EDE6;
+    --expense: #A6402C;
+    --expense-bg: #F3E4DE;
+    --accent: #1F3A5F;
+  }
+
+  *{ box-sizing: border-box; }
+
+  body{
+    margin: 0;
+    background: var(--paper);
+    color: var(--ink);
+    font-family: 'Inter', sans-serif;
+    -webkit-font-smoothing: antialiased;
+    padding: 48px 20px 80px;
+  }
+
+  .wrap{
+    max-width: 720px;
+    margin: 0 auto;
+  }
+
+  header{
+    margin-bottom: 36px;
+    border-bottom: 1px solid var(--line);
+    padding-bottom: 28px;
+  }
+
+  h1{
+    font-family: 'Fraunces', serif;
+    font-optical-sizing: auto;
+    font-weight: 600;
+    font-size: 42px;
+    letter-spacing: -0.01em;
+    margin: 0 0 6px;
+  }
+
+  header p{
+    margin: 0;
+    color: var(--ink-soft);
+    font-size: 15px;
+  }
+
+  /* Summary strip */
+  .summary{
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    border: 1px solid var(--line);
+    background: var(--card);
+    border-radius: 3px;
+    margin-bottom: 32px;
+  }
+
+  .summary .stat{
+    padding: 18px 20px;
+    border-right: 1px solid var(--line);
+  }
+  .summary .stat:last-child{ border-right: none; }
+
+  .stat .label{
+    font-size: 12px;
+    color: var(--ink-soft);
+    margin-bottom: 6px;
+  }
+
+  .stat .value{
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 22px;
+    font-variant-numeric: tabular-nums;
+  }
+
+  .stat.income .value{ color: var(--income); }
+  .stat.expense .value{ color: var(--expense); }
+  .stat.balance .value{ color: var(--accent); font-weight: 500; }
+
+  /* Add entry form */
+  form.entry{
+    background: var(--card);
+    border: 1px solid var(--line);
+    border-radius: 3px;
+    padding: 20px;
+    margin-bottom: 40px;
+  }
+
+  .toggle{
+    display: inline-flex;
+    border: 1px solid var(--line);
+    border-radius: 3px;
+    overflow: hidden;
+    margin-bottom: 16px;
+  }
+
+  .toggle button{
+    border: none;
+    background: transparent;
+    padding: 8px 18px;
+    font-family: 'Inter', sans-serif;
+    font-size: 13px;
+    font-weight: 500;
+    color: var(--ink-soft);
+    cursor: pointer;
+  }
+
+  .toggle button.active[data-type="income"]{
+    background: var(--income-bg);
+    color: var(--income);
+  }
+  .toggle button.active[data-type="expense"]{
+    background: var(--expense-bg);
+    color: var(--expense);
+  }
+
+  .fields{
+    display: grid;
+    grid-template-columns: 2fr 1fr 1fr;
+    gap: 12px;
+    margin-bottom: 12px;
+  }
+
+  .field label{
+    display: block;
+    font-size: 11.5px;
+    color: var(--ink-soft);
+    margin-bottom: 5px;
+  }
+
+  .field input, .field select{
+    width: 100%;
+    border: 1px solid var(--line);
+    background: #fff;
+    border-radius: 3px;
+    padding: 9px 10px;
+    font-family: 'Inter', sans-serif;
+    font-size: 14px;
+    color: var(--ink);
+  }
+
+  .field input:focus, .field select:focus, .toggle button:focus-visible, .add-btn:focus-visible, .del-btn:focus-visible{
+    outline: 2px solid var(--accent);
+    outline-offset: 1px;
+  }
+
+  .field.amount input{
+    font-family: 'IBM Plex Mono', monospace;
+  }
+
+  .add-btn{
+    border: none;
+    background: var(--accent);
+    color: #fff;
+    font-family: 'Inter', sans-serif;
+    font-size: 14px;
+    font-weight: 500;
+    padding: 10px 18px;
+    border-radius: 3px;
+    cursor: pointer;
+  }
+  .add-btn:hover{ background: #16283f; }
+
+  .error-msg{
+    color: var(--expense);
+    font-size: 12.5px;
+    margin: 4px 0 0;
+    min-height: 16px;
+  }
+
+  /* Ledger table */
+  .ledger-head{
+    display: flex;
+    justify-content: space-between;
+    align-items: baseline;
+    margin-bottom: 10px;
+  }
+
+  .ledger-head h2{
+    font-family: 'Fraunces', serif;
+    font-weight: 500;
+    font-size: 19px;
+    margin: 0;
+  }
+
+  .ledger-head .count{
+    font-size: 12.5px;
+    color: var(--ink-soft);
+  }
+
+  table{
+    width: 100%;
+    border-collapse: collapse;
+  }
+
+  thead th{
+    text-align: left;
+    font-size: 11px;
+    text-transform: none;
+    color: var(--ink-soft);
+    font-weight: 500;
+    padding: 0 10px 8px;
+    border-bottom: 1px solid var(--line);
+  }
+
+  thead th.num{ text-align: right; }
+
+  tbody td{
+    padding: 12px 10px;
+    border-bottom: 1px solid var(--line);
+    font-size: 14px;
+    vertical-align: middle;
+  }
+
+  tbody tr:hover{ background: rgba(31,58,95,0.035); }
+
+  td.date{
+    color: var(--ink-soft);
+    font-size: 13px;
+    white-space: nowrap;
+    width: 78px;
+  }
+
+  td.category .tag{
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    font-size: 12.5px;
+    color: var(--ink-soft);
+  }
+
+  td.category .dot{
+    width: 7px;
+    height: 7px;
+    border-radius: 50%;
+    flex: none;
+  }
+
+  td.amount, td.balance{
+    text-align: right;
+    font-family: 'IBM Plex Mono', monospace;
+    font-variant-numeric: tabular-nums;
+    white-space: nowrap;
+  }
+
+  td.amount.income{ color: var(--income); }
+  td.amount.expense{ color: var(--expense); }
+
+  td.balance{ color: var(--ink); }
+
+  td.actions{
+    text-align: right;
+    width: 30px;
+  }
+
+  .del-btn{
+    border: none;
+    background: transparent;
+    color: var(--ink-soft);
+    cursor: pointer;
+    font-size: 15px;
+    line-height: 1;
+    padding: 4px 6px;
+    border-radius: 3px;
+  }
+  .del-btn:hover{ color: var(--expense); background: var(--expense-bg); }
+
+  .empty-state{
+    padding: 40px 10px;
+    text-align: center;
+    color: var(--ink-soft);
+    font-size: 14px;
+    border: 1px dashed var(--line);
+    border-radius: 3px;
+  }
+
+  @media (max-width: 560px){
+    .fields{ grid-template-columns: 1fr 1fr; }
+    .field.desc{ grid-column: 1 / -1; }
+    .summary{ grid-template-columns: 1fr; }
+    .summary .stat{ border-right: none; border-bottom: 1px solid var(--line); }
+    .summary .stat:last-child{ border-bottom: none; }
+    td.category .tag span.label-text{ display: none; }
+  }
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <header>
+    <h1>Ledger</h1>
+    <p>A running record of what comes in and what goes out.</p>
+  </header>
+
+  <section class="summary">
+    <div class="stat income">
+      <div class="label">Income</div>
+      <div class="value" id="totalIncome">$0.00</div>
+    </div>
+    <div class="stat expense">
+      <div class="label">Expenses</div>
+      <div class="value" id="totalExpense">$0.00</div>
+    </div>
+    <div class="stat balance">
+      <div class="label">Balance</div>
+      <div class="value" id="totalBalance">$0.00</div>
+    </div>
+  </section>
+
+  <form class="entry" id="entryForm">
+    <div class="toggle" id="typeToggle">
+      <button type="button" data-type="income">Income</button>
+      <button type="button" data-type="expense" class="active">Expense</button>
+    </div>
+
+    <div class="fields">
+      <div class="field desc">
+        <label for="descInput">Description</label>
+        <input type="text" id="descInput" placeholder="e.g. Groceries" maxlength="60">
+      </div>
+      <div class="field amount">
+        <label for="amountInput">Amount</label>
+        <input type="number" id="amountInput" placeholder="0.00" step="0.01" min="0">
+      </div>
+      <div class="field">
+        <label for="categorySelect">Category</label>
+        <select id="categorySelect"></select>
+      </div>
+    </div>
+
+    <p class="error-msg" id="errorMsg"></p>
+    <button type="button" class="add-btn">Add entry</button>
+  </form>
+
+  <div class="ledger-head">
+    <h2>Register</h2>
+    <span class="count" id="entryCount">0 entries</span>
+  </div>
+
+  <table id="ledgerTable">
+    <thead>
+      <tr>
+        <th style="width:78px;">Date</th>
+        <th>Description</th>
+        <th>Category</th>
+        <th class="num">Amount</th>
+        <th class="num">Balance</th>
+        <th></th>
+      </tr>
+    </thead>
+    <tbody id="ledgerBody"></tbody>
+  </table>
+
+  <div class="empty-state" id="emptyState" style="display:none;">
+    No entries yet. Add your first transaction above to start the ledger.
+  </div>
+
+</div>
+
+<script>
+  // In-memory transaction store.
+  // (This preview environment doesn't support browser localStorage, so
+  // entries live in memory for the session. Outside this preview, swap
+  // `loadTransactions`/`saveTransactions` below for real
+  // localStorage.getItem/setItem calls to persist across page refreshes,
+  // exactly as the original spec describes.)
+  let transactions = [];
+  let nextId = 1;
+
+  function loadTransactions(){ return transactions; }
+  function saveTransactions(list){ transactions = list; }
+
+  const CATEGORIES = {
+    expense: [
+      { key: 'food', label: 'Food', color: '#A6402C' },
+      { key: 'transport', label: 'Transport', color: '#8A6A3D' },
+      { key: 'housing', label: 'Housing', color: '#5B6A8C' },
+      { key: 'utilities', label: 'Utilities', color: '#6E7F63' },
+      { key: 'entertainment', label: 'Entertainment', color: '#8C5B7A' },
+      { key: 'health', label: 'Health', color: '#4E7A8C' },
+      { key: 'shopping', label: 'Shopping', color: '#9C7A3D' },
+      { key: 'other', label: 'Other', color: '#5B6357' }
+    ],
+    income: [
+      { key: 'salary', label: 'Salary', color: '#2F6F4E' },
+      { key: 'freelance', label: 'Freelance', color: '#3D7A5C' },
+      { key: 'gift', label: 'Gift', color: '#4E8C6B' },
+      { key: 'investment', label: 'Investment', color: '#5C9C7A' },
+      { key: 'other', label: 'Other', color: '#5B6357' }
+    ]
+  };
+
+  const els = {
+    toggle: document.getElementById('typeToggle'),
+    categorySelect: document.getElementById('categorySelect'),
+    form: document.getElementById('entryForm'),
+    descInput: document.getElementById('descInput'),
+    amountInput: document.getElementById('amountInput'),
+    errorMsg: document.getElementById('errorMsg'),
+    body: document.getElementById('ledgerBody'),
+    empty: document.getElementById('emptyState'),
+    count: document.getElementById('entryCount'),
+    totalIncome: document.getElementById('totalIncome'),
+    totalExpense: document.getElementById('totalExpense'),
+    totalBalance: document.getElementById('totalBalance'),
+  };
+
+  let currentType = 'expense';
+
+  function fmt(amount){
+    const sign = amount < 0 ? '-' : '';
+    return sign + '$' + Math.abs(amount).toFixed(2);
+  }
+
+  function fmtDate(iso){
+    const d = new Date(iso);
+    return d.toLocaleDateString(undefined, { month: 'short', day: 'numeric' });
+  }
+
+  function populateCategories(){
+    els.categorySelect.innerHTML = '';
+    CATEGORIES[currentType].forEach(cat => {
+      const opt = document.createElement('option');
+      opt.value = cat.key;
+      opt.textContent = cat.label;
+      els.categorySelect.appendChild(opt);
+    });
+  }
+
+  els.toggle.addEventListener('click', (e) => {
+    const btn = e.target.closest('button[data-type]');
+    if(!btn) return;
+    currentType = btn.dataset.type;
+    [...els.toggle.querySelectorAll('button')].forEach(b => b.classList.toggle('active', b === btn));
+    populateCategories();
+  });
+
+  function getCategoryMeta(type, key){
+    return CATEGORIES[type].find(c => c.key === key) || CATEGORIES[type][CATEGORIES[type].length - 1];
+  }
+
+  function render(){
+    const list = loadTransactions();
+    els.body.innerHTML = '';
+
+    let income = 0, expense = 0;
+    // Compute running balance in chronological (insertion) order first.
+    let running = 0;
+    const withBalance = list.map(t => {
+      running += t.type === 'income' ? t.amount : -t.amount;
+      if(t.type === 'income') income += t.amount; else expense += t.amount;
+      return { ...t, runningBalance: running };
+    });
+
+    els.totalIncome.textContent = fmt(income);
+    els.totalExpense.textContent = fmt(expense);
+    els.totalBalance.textContent = fmt(income - expense);
+
+    els.count.textContent = list.length + (list.length === 1 ? ' entry' : ' entries');
+    els.empty.style.display = list.length === 0 ? 'block' : 'none';
+    document.getElementById('ledgerTable').style.display = list.length === 0 ? 'none' : 'table';
+
+    // Show newest first, each row still carries its true chronological balance.
+    [...withBalance].reverse().forEach(t => {
+      const meta = getCategoryMeta(t.type, t.category);
+      const tr = document.createElement('tr');
+      tr.innerHTML = `
+        <td class="date">${fmtDate(t.date)}</td>
+        <td class="desc">${escapeHtml(t.description)}</td>
+        <td class="category">
+          <span class="tag"><span class="dot" style="background:${meta.color}"></span><span class="label-text">${meta.label}</span></span>
+        </td>
+        <td class="amount ${t.type}">${t.type === 'income' ? '+' : '-'}${fmt(t.amount).replace('-','')}</td>
+        <td class="balance">${fmt(t.runningBalance)}</td>
+        <td class="actions"><button class="del-btn" data-id="${t.id}" aria-label="Delete entry">×</button></td>
+      `;
+      els.body.appendChild(tr);
+    });
+  }
+
+  function escapeHtml(str){
+    const div = document.createElement('div');
+    div.textContent = str;
+    return div.innerHTML;
+  }
+
+  els.body.addEventListener('click', (e) => {
+    const btn = e.target.closest('.del-btn');
+    if(!btn) return;
+    const id = Number(btn.dataset.id);
+    const list = loadTransactions().filter(t => t.id !== id);
+    saveTransactions(list);
+    render();
+  });
+
+  function handleAddEntry(e){
+    if(e && e.preventDefault) e.preventDefault();
+    els.errorMsg.textContent = '';
+
+    const description = els.descInput.value.trim();
+    const amount = parseFloat(els.amountInput.value);
+
+    if(!description){
+      els.errorMsg.textContent = 'Add a description for this entry.';
+      return;
+    }
+    if(isNaN(amount) || amount <= 0){
+      els.errorMsg.textContent = 'Enter an amount greater than zero.';
+      return;
+    }
+
+    const entry = {
+      id: nextId++,
+      type: currentType,
+      description,
+      category: els.categorySelect.value,
+      amount: Math.round(amount * 100) / 100,
+      date: new Date().toISOString()
+    };
+
+    const list = loadTransactions();
+    list.push(entry);
+    saveTransactions(list);
+
+    els.descInput.value = '';
+    els.amountInput.value = '';
+    els.descInput.focus();
+    render();
+  }
+
+  // Bound via plain click (not form 'submit') so this works even inside
+  // sandboxed preview frames that block native form submission. An Enter
+  // keypress in either input triggers the same handler for convenience.
+  document.querySelector('.add-btn').addEventListener('click', handleAddEntry);
+  [els.descInput, els.amountInput].forEach(input => {
+    input.addEventListener('keydown', (e) => {
+      if(e.key === 'Enter') handleAddEntry(e);
+    });
+  });
+
+  populateCategories();
+  render();
+</script>
+</body>
+</html>
